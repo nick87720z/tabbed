@@ -49,7 +49,7 @@
 
 enum { ColFG, ColBG, ColLast };       /* color */
 enum { WMProtocols, WMDelete, WMName, WMState, WMFullscreen,
-       XEmbed, WMSelectTab, WMLast }; /* default atoms */
+       XEmbed, WMSelectTab, PWD, WMLast }; /* default atoms */
 enum { StrCompound, StrUTF8, StrLast }; /* text style atoms */
 
 typedef union {
@@ -110,7 +110,8 @@ static char *getatom(int a);
 static int getclient(Window w);
 static XftColor getcolor(const char *colstr);
 static int getfirsttab(void);
-static Bool gettextprop(Window w, Atom atom, char *text, unsigned int size);
+static char * gettextprop(Window w, Atom atom);
+static Bool gettextpropn(Window w, Atom atom, char *text, unsigned int size);
 static void initfont(const char *fontstr);
 static Bool isprotodel(int c);
 static void keypress(const XEvent *e);
@@ -604,8 +605,33 @@ getfirsttab(void)
 	       ret;
 }
 
+char *
+gettextprop(Window w, Atom atom)
+{
+	char *text;
+	char **list = NULL;
+	int n;
+	XTextProperty name;
+
+	XGetTextProperty(dpy, w, &name, atom);
+	if (!name.nitems)
+		return NULL;
+
+	if (name.encoding == XA_STRING) {
+		text = strdup((char *)name.value);
+	} else if (((name.encoding == stratom[StrCompound] && XmbTextPropertyToTextList(dpy, &name, &list, &n) >= Success) ||
+	            (name.encoding == stratom[StrUTF8]     && Xutf8TextPropertyToTextList(dpy, &name, &list, &n) >= Success))
+	           && n > 0 && *list) {
+		text = strdup(*list);
+		XFreeStringList(list);
+	}
+	XFree(name.value);
+
+	return text;
+}
+
 Bool
-gettextprop(Window w, Atom atom, char *text, unsigned int size)
+gettextpropn(Window w, Atom atom, char *text, unsigned int size)
 {
 	char **list = NULL;
 	int n;
@@ -1006,6 +1032,7 @@ setup(void)
 	wmatom[WMSelectTab] = XInternAtom(dpy, "_TABBED_SELECT_TAB", False);
 	wmatom[WMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
 	wmatom[XEmbed] = XInternAtom(dpy, "_XEMBED", False);
+	wmatom[PWD] =  XInternAtom(dpy, "PWD", False);
 
 	stratom[StrCompound] = XInternAtom(dpy, "COMPOUND_TEXT", False);
 	stratom[StrUTF8] = XInternAtom(dpy, "UTF8_STRING", False);
@@ -1104,7 +1131,17 @@ sigchld(int unused)
 void
 spawn(const Arg *arg)
 {
+	char * pwd = NULL;
+
+	if (sel != -1)
+		pwd = gettextprop(clients[sel]->win, wmatom[PWD]);
+
 	if (fork() == 0) {
+		if (pwd) {
+			chdir(pwd);
+			free(pwd);
+		}
+
 		if(dpy)
 			close(ConnectionNumber(dpy));
 
@@ -1121,6 +1158,7 @@ spawn(const Arg *arg)
 		perror(" failed");
 		exit(0);
 	}
+	free(pwd);
 }
 
 int
@@ -1227,9 +1265,9 @@ updatenumlockmask(void)
 void
 updatetitle(int c)
 {
-	if (!gettextprop(clients[c]->win, wmatom[WMName], clients[c]->name,
+	if (!gettextpropn(clients[c]->win, wmatom[WMName], clients[c]->name,
 	    sizeof(clients[c]->name)))
-		gettextprop(clients[c]->win, XA_WM_NAME, clients[c]->name,
+		gettextpropn(clients[c]->win, XA_WM_NAME, clients[c]->name,
 		            sizeof(clients[c]->name));
 	if (sel == c)
 		xsettitle(win, clients[c]->name);
