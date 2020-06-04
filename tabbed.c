@@ -220,10 +220,11 @@ cleanup(void)
 		focus(i);
 		killclient(NULL);
 		XReparentWindow(dpy, clients[i]->win, root, 0, 0);
-		unmanage(i);
+		free(clients[i]);
 	}
 	free(clients);
 	clients = NULL;
+	XSync(dpy, False);
 
 	XFreePixmap(dpy, dc.drawable);
 	XFreeGC(dpy, dc.gc);
