@@ -50,6 +50,7 @@
 enum { ColFG, ColBG, ColLast };       /* color */
 enum { WMProtocols, WMDelete, WMName, WMState, WMFullscreen,
        XEmbed, WMSelectTab, WMLast }; /* default atoms */
+enum { StrCompound, StrUTF8, StrLast }; /* text style atoms */
 
 typedef union {
 	int i;
@@ -160,6 +161,7 @@ static Bool running = True, nextfocus, doinitspawn = True,
 static Display *dpy;
 static DC dc;
 static Atom wmatom[WMLast];
+static Atom stratom[StrLast];
 static Window root, win;
 static Client **clients;
 static int nclients, sel = -1, lastsel = -1;
@@ -616,7 +618,8 @@ gettextprop(Window w, Atom atom, char *text, unsigned int size)
 
 	if (name.encoding == XA_STRING) {
 		strncpy(text, (char *)name.value, size - 1);
-	} else if (XmbTextPropertyToTextList(dpy, &name, &list, &n) >= Success
+	} else if (((name.encoding == stratom[StrCompound] && XmbTextPropertyToTextList(dpy, &name, &list, &n) >= Success) ||
+	            (name.encoding == stratom[StrUTF8]     && Xutf8TextPropertyToTextList(dpy, &name, &list, &n) >= Success))
 	           && n > 0 && *list) {
 		strncpy(text, *list, size - 1);
 		XFreeStringList(list);
@@ -996,6 +999,9 @@ setup(void)
 	wmatom[WMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
 	wmatom[XEmbed] = XInternAtom(dpy, "_XEMBED", False);
 
+	stratom[StrCompound] = XInternAtom(dpy, "COMPOUND_TEXT", False);
+	stratom[StrUTF8] = XInternAtom(dpy, "UTF8_STRING", False);
+
 	/* init appearance */
 	wx = 0;
 	wy = 0;
@@ -1257,9 +1263,13 @@ xsettitle(Window w, const char *str)
 {
 	XTextProperty xtp;
 
+	if (Xutf8TextListToTextProperty(dpy, (char **)&str, 1,
+	    XUTF8StringStyle, &xtp) == Success) {
+		XSetTextProperty(dpy, w, &xtp, wmatom[WMName]);
+		XFree(xtp.value);
+	}
 	if (XmbTextListToTextProperty(dpy, (char **)&str, 1,
 	    XCompoundTextStyle, &xtp) == Success) {
-		XSetTextProperty(dpy, w, &xtp, wmatom[WMName]);
 		XSetTextProperty(dpy, w, &xtp, XA_WM_NAME);
 		XFree(xtp.value);
 	}
