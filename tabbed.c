@@ -197,8 +197,8 @@ buttonpress(const XEvent *e)
 				focus(i);
 				break;
 			case Button2:
-				focus(i);
-				killclient(NULL);
+				arg.i = i;
+				killclient(&arg);
 				break;
 			case Button4: /* FALLTHROUGH */
 			case Button5:
@@ -215,10 +215,12 @@ void
 cleanup(void)
 {
 	int i;
+	Arg arg;
 
 	for (i = 0; i < nclients; i++) {
-		focus(i);
-		killclient(NULL);
+		arg.i = i;
+		killclient(&arg);
+		XUnmapWindow(dpy, clients[i]->win);
 		XReparentWindow(dpy, clients[i]->win, root, 0, 0);
 		free(clients[i]);
 	}
@@ -681,21 +683,26 @@ void
 killclient(const Arg *arg)
 {
 	XEvent ev;
+	int i;
 
-	if (sel < 0)
+	if (arg)
+		i = arg->i;
+	else if (sel >= 0)
+		i = sel;
+	else
 		return;
 
-	if (isprotodel(sel) && !clients[sel]->closed) {
+	if (isprotodel(i) && !clients[i]->closed) {
 		ev.type = ClientMessage;
-		ev.xclient.window = clients[sel]->win;
+		ev.xclient.window = clients[i]->win;
 		ev.xclient.message_type = wmatom[WMProtocols];
 		ev.xclient.format = 32;
 		ev.xclient.data.l[0] = wmatom[WMDelete];
 		ev.xclient.data.l[1] = CurrentTime;
-		XSendEvent(dpy, clients[sel]->win, False, NoEventMask, &ev);
-		clients[sel]->closed = True;
+		XSendEvent(dpy, clients[i]->win, False, NoEventMask, &ev);
+		clients[i]->closed = True;
 	} else {
-		XKillClient(dpy, clients[sel]->win);
+		XKillClient(dpy, clients[i]->win);
 	}
 }
 
