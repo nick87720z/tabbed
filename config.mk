@@ -18,7 +18,7 @@ FREETYPEINC = /usr/include/freetype2
 
 # includes and libs
 INCS = -I. -I$(X11INC) -I$(FREETYPEINC)
-LIBS = -L$(X11LIB) -lX11 $(FREETYPELIBS)
+LIBS = -L$(X11LIB) -lX11 $(FREETYPELIBS) -lXrender
 
 # flags
 CPPFLAGS = -DVERSION=\"$(VERSION)\" -D_DEFAULT_SOURCE
