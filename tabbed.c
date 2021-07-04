@@ -1134,7 +1134,7 @@ textnw(const char *text, unsigned int len)
 void
 toggle(const Arg *arg)
 {
-    *(Bool*) arg->v = !*(Bool*) arg->v;
+	*(Bool*) arg->v = !*(Bool*) arg->v;
 }
 
 void
